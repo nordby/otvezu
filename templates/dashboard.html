@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Панель управления - Система экспедирования{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Панель управления</h1>
+</div>
+
+<div class="row">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            Рейсы сегодня
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.trips_today }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-calendar fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            Выручка за месяц
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ "{:,.0f}".format(stats.revenue_month) }} ₽</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-ruble-sign fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                            Активные водители
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.active_drivers }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-user fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                            Автопарк
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.active_vehicles }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-truck fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Последние рейсы</h6>
+            </div>
+            <div class="card-body">
+                {% if recent_trips %}
+                <div class="table-responsive">
+                    <table class="table table-bordered" width="100%">
+                        <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>Водитель</th>
+                                <th>Путевой лист</th>
+                                <th>Маршрут</th>
+                                <th>Количество</th>
+                                <th>Сумма</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for trip in recent_trips %}
+                            <tr>
+                                <td>{{ trip.date }}</td>
+                                <td>{{ trip.driver_name }}</td>
+                                <td>{{ trip.waybill_number }}</td>
+                                <td>{{ trip.service_description }}</td>
+                                <td>{{ trip.quantity }} шт.</td>
+                                <td>{{ "{:,.0f}".format(trip.total_amount) }} ₽</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted">Рейсы за сегодня отсутствуют</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

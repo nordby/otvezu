@@ -1,0 +1,826 @@
+{% extends "base.html" %}
+
+{% block title %}Водители - Система экспедирования{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Управление водителями</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleSelection()">
+                <i class="fas fa-check-square"></i> Выбрать все
+            </button>
+            <div class="btn-group">
+                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="fas fa-cogs"></i> Массовые операции
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" onclick="bulkAction('activate')">
+                        <i class="fas fa-play text-success"></i> Активировать выбранных
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="bulkAction('deactivate')">
+                        <i class="fas fa-pause text-warning"></i> Деактивировать выбранных
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="bulkAction('reset_passwords')">
+                        <i class="fas fa-key text-info"></i> Сбросить пароли
+                    </a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-danger" href="#" onclick="bulkAction('delete')">
+                        <i class="fas fa-trash"></i> Удалить выбранных
+                    </a></li>
+                </ul>
+            </div>
+        </div>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addDriverModal">
+            <i class="fas fa-plus"></i> Добавить водителя
+        </button>
+    </div>
+</div>
+
+<!-- Поиск и фильтры -->
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <input type="text" class="form-control" id="searchInput" placeholder="Поиск по ФИО...">
+                    <button class="btn btn-outline-secondary" type="button" onclick="searchDrivers()">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="statusFilter" onchange="filterDrivers()">
+                    <option value="">Все статусы</option>
+                    <option value="active">Активные</option>
+                    <option value="inactive">Неактивные</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="telegramFilter" onchange="filterDrivers()">
+                    <option value="">Все водители</option>
+                    <option value="with_telegram">С Telegram</option>
+                    <option value="without_telegram">Без Telegram</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Таблица водителей -->
+<div class="card shadow">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">
+            Список водителей 
+            <span class="badge bg-primary" id="driversCount">{{ drivers|length }}</span>
+        </h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover" id="driversTable">
+                <thead class="table-dark">
+                    <tr>
+                        <th width="40">
+                            <input type="checkbox" id="selectAll" onchange="toggleAllSelection()">
+                        </th>
+                        <th>ID</th>
+                        <th>ФИО</th>
+                        <th>Статус</th>
+                        <th>Telegram</th>
+                        <th>Рейсов</th>
+                        <th>Последний рейс</th>
+                        <th>Дата создания</th>
+                        <th width="200">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for driver in drivers %}
+                    <tr data-driver-id="{{ driver.id }}" class="driver-row">
+                        <td>
+                            <input type="checkbox" class="driver-checkbox" value="{{ driver.id }}">
+                        </td>
+                        <td>{{ driver.id }}</td>
+                        <td>
+                            <strong>{{ driver.surname }} {{ driver.first_name }}</strong>
+                            {% if driver.middle_name %}
+                                <br><small class="text-muted">{{ driver.middle_name }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if driver.is_active %}
+                                <span class="badge bg-success">Активен</span>
+                            {% else %}
+                                <span class="badge bg-danger">Неактивен</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if driver.telegram_id %}
+                                <i class="fab fa-telegram text-primary" title="Подключен к Telegram"></i>
+                            {% else %}
+                                <i class="fas fa-times text-muted" title="Не подключен к Telegram"></i>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-info" id="trips-count-{{ driver.id }}">...</span>
+                        </td>
+                        <td>
+                            <span class="text-muted" id="last-trip-{{ driver.id }}">...</span>
+                        </td>
+                        <td>{{ driver.created_at.strftime('%d.%m.%Y') }}</td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                <button class="btn btn-sm btn-outline-info" onclick="showDriverInfo({{ driver.id }})" title="Информация">
+                                    <i class="fas fa-info-circle"></i>
+                                </button>
+                                
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" title="Пароль">
+                                        <i class="fas fa-key"></i>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="#" onclick="resetPassword({{ driver.id }})">
+                                            <i class="fas fa-redo"></i> Сбросить пароль
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="changePassword({{ driver.id }})">
+                                            <i class="fas fa-edit"></i> Изменить пароль
+                                        </a></li>
+                                    </ul>
+                                </div>
+                                
+                                {% if driver.is_active %}
+                                    <button class="btn btn-sm btn-outline-warning" onclick="toggleDriverStatus({{ driver.id }}, false)" title="Деактивировать">
+                                        <i class="fas fa-pause"></i>
+                                    </button>
+                                {% else %}
+                                    <button class="btn btn-sm btn-outline-success" onclick="toggleDriverStatus({{ driver.id }}, true)" title="Активировать">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                {% endif %}
+                                
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteDriver({{ driver.id }})" title="Удалить">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно добавления водителя -->
+<div class="modal fade" id="addDriverModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить водителя</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addDriverForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="surname" class="form-label">Фамилия *</label>
+                        <input type="text" class="form-control" id="surname" name="surname" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="first_name" class="form-label">Имя *</label>
+                        <input type="text" class="form-control" id="first_name" name="first_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="middle_name" class="form-label">Отчество</label>
+                        <input type="text" class="form-control" id="middle_name" name="middle_name">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Создать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно информации о водителе -->
+<div class="modal fade" id="driverInfoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Информация о водителе</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="driverInfoContent">
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Загрузка...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно изменения пароля -->
+<div class="modal fade" id="changePasswordModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Изменить пароль</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="changePasswordForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="newPassword" class="form-label">Новый пароль (минимум 6 символов)</label>
+                        <input type="password" class="form-control" id="newPassword" name="new_password" required minlength="6">
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirmPassword" class="form-label">Подтверждение пароля</label>
+                        <input type="password" class="form-control" id="confirmPassword" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Изменить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно результатов массовых операций -->
+<div class="modal fade" id="bulkResultsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Результаты операции</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="bulkResultsContent">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedDrivers = new Set();
+let currentDriverId = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadDriversStats();
+    
+    // Обработчик формы добавления водителя
+    document.getElementById('addDriverForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        
+        try {
+            const response = await fetch('/drivers/create', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showAlert('Водитель создан успешно! Пароль: ' + result.password, 'success');
+                bootstrap.Modal.getInstance(document.getElementById('addDriverModal')).hide();
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                showAlert('Ошибка: ' + result.message, 'danger');
+            }
+        } catch (error) {
+            showAlert('Произошла ошибка при создании водителя', 'danger');
+        }
+    });
+    
+    // Обработчик формы изменения пароля
+    document.getElementById('changePasswordForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const newPassword = document.getElementById('newPassword').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+        
+        if (newPassword !== confirmPassword) {
+            showAlert('Пароли не совпадают', 'warning');
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('new_password', newPassword);
+        
+        try {
+            const response = await fetch(`/drivers/${currentDriverId}/change_password`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showAlert('Пароль изменен успешно!', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('changePasswordModal')).hide();
+            } else {
+                showAlert('Ошибка: ' + result.message, 'danger');
+            }
+        } catch (error) {
+            showAlert('Произошла ошибка при изменении пароля', 'danger');
+        }
+    });
+    
+    // Поиск по Enter
+    document.getElementById('searchInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            searchDrivers();
+        }
+    });
+});
+
+async function loadDriversStats() {
+    try {
+        const rows = document.querySelectorAll('.driver-row');
+        
+        for (const row of rows) {
+            const driverId = row.dataset.driverId;
+            
+            try {
+                const response = await fetch(`/drivers/${driverId}/info`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    const data = result.data;
+                    
+                    // Обновляем количество рейсов
+                    const tripsElement = document.getElementById(`trips-count-${driverId}`);
+                    if (tripsElement) {
+                        tripsElement.textContent = data.total_trips;
+                        tripsElement.title = `Завершено: ${data.completed_trips}, Активных: ${data.active_trips}`;
+                    }
+                    
+                    // Обновляем дату последнего рейса
+                    const lastTripElement = document.getElementById(`last-trip-${driverId}`);
+                    if (lastTripElement) {
+                        if (data.last_trip_date) {
+                            lastTripElement.textContent = new Date(data.last_trip_date).toLocaleDateString('ru-RU');
+                        } else {
+                            lastTripElement.textContent = 'Нет рейсов';
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error(`Ошибка загрузки статистики для водителя ${driverId}:`, error);
+            }
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки статистики водителей:', error);
+    }
+}
+
+async function showDriverInfo(driverId) {
+    const modal = new bootstrap.Modal(document.getElementById('driverInfoModal'));
+    const content = document.getElementById('driverInfoContent');
+    
+    // Показываем спиннер
+    content.innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Загрузка...</span>
+            </div>
+        </div>
+    `;
+    
+    modal.show();
+    
+    try {
+        const response = await fetch(`/drivers/${driverId}/info`);
+        const result = await response.json();
+        
+        if (result.success) {
+            const data = result.data;
+            
+            content.innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Основная информация</h6>
+                        <table class="table table-borderless">
+                            <tr><td><strong>ID:</strong></td><td>${data.id}</td></tr>
+                            <tr><td><strong>ФИО:</strong></td><td>${data.full_name}</td></tr>
+                            <tr><td><strong>Роль:</strong></td><td>${data.role}</td></tr>
+                            <tr><td><strong>Статус:</strong></td><td>
+                                ${data.is_active ? '<span class="badge bg-success">Активен</span>' : '<span class="badge bg-danger">Неактивен</span>'}
+                            </td></tr>
+                            <tr><td><strong>Telegram:</strong></td><td>
+                                ${data.has_telegram ? '<i class="fab fa-telegram text-primary"></i> Подключен' : '<i class="fas fa-times text-muted"></i> Не подключен'}
+                            </td></tr>
+                            <tr><td><strong>Создан:</strong></td><td>${new Date(data.created_at).toLocaleString('ru-RU')}</td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Статистика рейсов</h6>
+                        <table class="table table-borderless">
+                            <tr><td><strong>Всего рейсов:</strong></td><td><span class="badge bg-primary">${data.total_trips}</span></td></tr>
+                            <tr><td><strong>Завершено:</strong></td><td><span class="badge bg-success">${data.completed_trips}</span></td></tr>
+                            <tr><td><strong>Активных:</strong></td><td><span class="badge bg-warning">${data.active_trips}</span></td></tr>
+                            <tr><td><strong>Отменено:</strong></td><td><span class="badge bg-danger">${data.cancelled_trips}</span></td></tr>
+                            <tr><td><strong>Последний рейс:</strong></td><td>
+                                ${data.last_trip_date ? new Date(data.last_trip_date).toLocaleDateString('ru-RU') : 'Нет рейсов'}
+                            </td></tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <h6>Быстрые действия</h6>
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-outline-info" onclick="resetPassword(${data.id})">
+                            <i class="fas fa-redo"></i> Сбросить пароль
+                        </button>
+                        <button class="btn btn-outline-secondary" onclick="changePassword(${data.id})">
+                            <i class="fas fa-edit"></i> Изменить пароль
+                        </button>
+                        ${data.is_active ? 
+                            `<button class="btn btn-outline-warning" onclick="toggleDriverStatus(${data.id}, false)">
+                                <i class="fas fa-pause"></i> Деактивировать
+                            </button>` :
+                            `<button class="btn btn-outline-success" onclick="toggleDriverStatus(${data.id}, true)">
+                                <i class="fas fa-play"></i> Активировать
+                            </button>`
+                        }
+                    </div>
+                </div>
+            `;
+        } else {
+            content.innerHTML = `<div class="alert alert-danger">Ошибка загрузки информации: ${result.message}</div>`;
+        }
+    } catch (error) {
+        content.innerHTML = `<div class="alert alert-danger">Произошла ошибка при загрузке информации</div>`;
+    }
+}
+
+async function resetPassword(driverId) {
+    if (!confirm('Вы уверены, что хотите сбросить пароль водителя? Будет сгенерирован новый случайный пароль.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/drivers/${driverId}/reset_password`, {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert(`Пароль сброшен! Новый пароль: <strong>${result.new_password}</strong>`, 'success');
+        } else {
+            showAlert('Ошибка: ' + result.message, 'danger');
+        }
+    } catch (error) {
+        showAlert('Произошла ошибка при сбросе пароля', 'danger');
+    }
+}
+
+function changePassword(driverId) {
+    currentDriverId = driverId;
+    
+    // Очищаем форму
+    document.getElementById('newPassword').value = '';
+    document.getElementById('confirmPassword').value = '';
+    
+    new bootstrap.Modal(document.getElementById('changePasswordModal')).show();
+}
+
+async function toggleDriverStatus(driverId, activate) {
+    const action = activate ? 'activate' : 'deactivate';
+    const confirmMessage = activate ? 'Активировать водителя?' : 'Деактивировать водителя?';
+    
+    if (!confirm(confirmMessage)) return;
+    
+    try {
+        const response = await fetch(`/drivers/${driverId}/${action}`, {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert(result.message, 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showAlert('Ошибка: ' + result.message, 'danger');
+        }
+    } catch (error) {
+        showAlert('Произошла ошибка при изменении статуса водителя', 'danger');
+    }
+}
+
+async function deleteDriver(driverId) {
+    const driverRow = document.querySelector(`[data-driver-id="${driverId}"]`);
+    const driverName = driverRow.querySelector('strong').textContent;
+    
+    const force = confirm(`Вы уверены, что хотите удалить водителя "${driverName}"?\n\nЕсли у водителя есть рейсы, они также будут удалены!`);
+    
+    if (!force) return;
+    
+    try {
+        const response = await fetch(`/drivers/${driverId}?force=${force}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert(result.message, 'success');
+            driverRow.remove();
+            updateDriversCount();
+        } else {
+            showAlert('Ошибка: ' + result.message, 'danger');
+        }
+    } catch (error) {
+        showAlert('Произошла ошибка при удалении водителя', 'danger');
+    }
+}
+
+// Функции выбора и массовых операций
+function toggleAllSelection() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.driver-checkbox');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+        if (selectAll.checked) {
+            selectedDrivers.add(parseInt(checkbox.value));
+        } else {
+            selectedDrivers.delete(parseInt(checkbox.value));
+        }
+    });
+    
+    updateSelectionUI();
+}
+
+function toggleSelection() {
+    const selectAll = document.getElementById('selectAll');
+    selectAll.checked = !selectAll.checked;
+    toggleAllSelection();
+}
+
+function updateSelectionUI() {
+    const count = selectedDrivers.size;
+    const button = document.querySelector('[onclick="toggleSelection()"]');
+    
+    if (count > 0) {
+        button.innerHTML = `<i class="fas fa-check-square"></i> Выбрано: ${count}`;
+        button.classList.add('btn-info');
+        button.classList.remove('btn-outline-secondary');
+    } else {
+        button.innerHTML = '<i class="fas fa-check-square"></i> Выбрать все';
+        button.classList.remove('btn-info');
+        button.classList.add('btn-outline-secondary');
+    }
+}
+
+// Обработчики изменения чекбоксов
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('driver-checkbox')) {
+        const driverId = parseInt(e.target.value);
+        
+        if (e.target.checked) {
+            selectedDrivers.add(driverId);
+        } else {
+            selectedDrivers.delete(driverId);
+        }
+        
+        updateSelectionUI();
+        
+        // Обновляем состояние "Выбрать все"
+        const allCheckboxes = document.querySelectorAll('.driver-checkbox');
+        const checkedCheckboxes = document.querySelectorAll('.driver-checkbox:checked');
+        const selectAll = document.getElementById('selectAll');
+        
+        selectAll.checked = allCheckboxes.length === checkedCheckboxes.length;
+        selectAll.indeterminate = checkedCheckboxes.length > 0 && checkedCheckboxes.length < allCheckboxes.length;
+    }
+});
+
+async function bulkAction(action) {
+    if (selectedDrivers.size === 0) {
+        showAlert('Выберите водителей для выполнения операции', 'warning');
+        return;
+    }
+    
+    let confirmMessage = '';
+    let forceDelete = false;
+    
+    switch (action) {
+        case 'activate':
+            confirmMessage = `Активировать ${selectedDrivers.size} водителей?`;
+            break;
+        case 'deactivate':
+            confirmMessage = `Деактивировать ${selectedDrivers.size} водителей?`;
+            break;
+        case 'reset_passwords':
+            confirmMessage = `Сбросить пароли ${selectedDrivers.size} водителей? Будут сгенерированы новые случайные пароли.`;
+            break;
+        case 'delete':
+            confirmMessage = `ВНИМАНИЕ! Удалить ${selectedDrivers.size} водителей?\n\nЭто действие необратимо! Все связанные рейсы также будут удалены.`;
+            forceDelete = true;
+            break;
+    }
+    
+    if (!confirm(confirmMessage)) return;
+    
+    try {
+        const response = await fetch('/drivers/bulk_action', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                action: action,
+                driver_ids: Array.from(selectedDrivers),
+                force: forceDelete
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Показываем результаты в модальном окне
+            const modal = new bootstrap.Modal(document.getElementById('bulkResultsModal'));
+            const content = document.getElementById('bulkResultsContent');
+            
+            let resultsHtml = '<div class="alert alert-success">Операция выполнена успешно!</div>';
+            
+            if (result.results && result.results.length > 0) {
+                resultsHtml += '<h6>Результаты:</h6><ul class="list-group">';
+                
+                result.results.forEach(resultItem => {
+                    if (action === 'reset_passwords' && resultItem.includes(':')) {
+                        // Для сброса паролей показываем имя и пароль
+                        const [name, password] = resultItem.split(': ');
+                        resultsHtml += `
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <strong>${name}</strong>
+                                <code class="bg-light p-1 rounded">${password}</code>
+                            </li>
+                        `;
+                    } else {
+                        resultsHtml += `<li class="list-group-item">${resultItem}</li>`;
+                    }
+                });
+                
+                resultsHtml += '</ul>';
+                
+                if (action === 'reset_passwords') {
+                    resultsHtml += '<div class="alert alert-info mt-3"><i class="fas fa-info-circle"></i> Сохраните эти пароли и передайте водителям!</div>';
+                }
+            }
+            
+            content.innerHTML = resultsHtml;
+            modal.show();
+            
+            // Перезагружаем страницу через 3 секунды (кроме сброса паролей)
+            if (action !== 'reset_passwords') {
+                setTimeout(() => location.reload(), 3000);
+            }
+            
+        } else {
+            showAlert('Ошибка: ' + result.message, 'danger');
+        }
+    } catch (error) {
+        showAlert('Произошла ошибка при выполнении операции', 'danger');
+    }
+}
+
+// Функции поиска и фильтрации
+async function searchDrivers() {
+    const query = document.getElementById('searchInput').value.trim();
+    
+    if (query.length < 2) {
+        showAlert('Введите минимум 2 символа для поиска', 'warning');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&type=drivers`);
+        const result = await response.json();
+        
+        if (result.success) {
+            highlightSearchResults(result.results.drivers, query);
+        } else {
+            showAlert('Ошибка поиска: ' + result.message, 'danger');
+        }
+    } catch (error) {
+        showAlert('Произошла ошибка при поиске', 'danger');
+    }
+}
+
+function highlightSearchResults(searchResults, query) {
+    const allRows = document.querySelectorAll('.driver-row');
+    const foundIds = new Set(searchResults.map(r => r.id));
+    
+    allRows.forEach(row => {
+        const driverId = parseInt(row.dataset.driverId);
+        
+        if (foundIds.has(driverId)) {
+            row.style.display = '';
+            row.classList.add('table-warning');
+            
+            // Подсвечиваем найденный текст
+            const nameCell = row.querySelector('strong');
+            if (nameCell) {
+                const originalText = nameCell.textContent;
+                const highlightedText = originalText.replace(
+                    new RegExp(`(${query})`, 'gi'),
+                    '<mark>$1</mark>'
+                );
+                nameCell.innerHTML = highlightedText;
+            }
+        } else {
+            row.style.display = 'none';
+            row.classList.remove('table-warning');
+        }
+    });
+    
+    updateDriversCount();
+    
+    // Убираем подсветку через 5 секунд
+    setTimeout(() => {
+        allRows.forEach(row => {
+            row.classList.remove('table-warning');
+            const nameCell = row.querySelector('strong');
+            if (nameCell && nameCell.innerHTML.includes('<mark>')) {
+                nameCell.innerHTML = nameCell.textContent;
+            }
+        });
+    }, 5000);
+}
+
+function filterDrivers() {
+    const statusFilter = document.getElementById('statusFilter').value;
+    const telegramFilter = document.getElementById('telegramFilter').value;
+    const rows = document.querySelectorAll('.driver-row');
+    
+    rows.forEach(row => {
+        let showRow = true;
+        
+        // Фильтр по статусу
+        if (statusFilter) {
+            const statusBadge = row.querySelector('.badge');
+            const isActive = statusBadge && statusBadge.classList.contains('bg-success');
+            
+            if (statusFilter === 'active' && !isActive) showRow = false;
+            if (statusFilter === 'inactive' && isActive) showRow = false;
+        }
+        
+        // Фильтр по Telegram
+        if (telegramFilter) {
+            const telegramIcon = row.querySelector('.fab.fa-telegram');
+            const hasTelegram = telegramIcon !== null;
+            
+            if (telegramFilter === 'with_telegram' && !hasTelegram) showRow = false;
+            if (telegramFilter === 'without_telegram' && hasTelegram) showRow = false;
+        }
+        
+        row.style.display = showRow ? '' : 'none';
+    });
+    
+    updateDriversCount();
+    
+    // Очищаем поиск при фильтрации
+    document.getElementById('searchInput').value = '';
+}
+
+function updateDriversCount() {
+    const visibleRows = document.querySelectorAll('.driver-row[style=""], .driver-row:not([style])');
+    const countElement = document.getElementById('driversCount');
+    if (countElement) {
+        countElement.textContent = visibleRows.length;
+    }
+}
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

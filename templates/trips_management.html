@@ -1,0 +1,526 @@
+{% extends "base.html" %}
+
+{% block title %}Управление рейсами - Система экспедирования{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Управление рейсами</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshTrips()">
+                <i class="fas fa-sync-alt"></i> Обновить
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Фильтры -->
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <form id="tripsFilter">
+            <div class="row">
+                <div class="col-md-2">
+                    <label for="startDate" class="form-label">Дата начала</label>
+                    <input type="date" class="form-control" id="startDate" name="start_date">
+                </div>
+                <div class="col-md-2">
+                    <label for="endDate" class="form-label">Дата окончания</label>
+                    <input type="date" class="form-control" id="endDate" name="end_date">
+                </div>
+                <div class="col-md-2">
+                    <label for="statusFilter" class="form-label">Статус</label>
+                    <select class="form-select" id="statusFilter" name="status">
+                        <option value="">Все статусы</option>
+                        <option value="created">Создан</option>
+                        <option value="started">В пути</option>
+                        <option value="completed">Завершен</option>
+                        <option value="cancelled">Отменен</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="driverFilter" class="form-label">Водитель</label>
+                    <select class="form-select" id="driverFilter" name="driver_id">
+                        <option value="">Все водители</option>
+                        <!-- Загружается динамически -->
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="vehicleFilter" class="form-label">ТС</label>
+                    <select class="form-select" id="vehicleFilter" name="vehicle_id">
+                        <option value="">Все ТС</option>
+                        <!-- Загружается динамически -->
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <div class="d-grid">
+                        <button type="button" class="btn btn-primary" onclick="loadTrips()">
+                            <i class="fas fa-search"></i> Показать
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Статистика -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Всего рейсов</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalTrips">-</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-list fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Завершено</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="completedTrips">-</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">В пути</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="activeTrips">-</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-truck fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Общий доход</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalRevenue">-</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Таблица рейсов -->
+<div class="card shadow">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Список рейсов</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover" id="tripsTable">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Дата</th>
+                        <th>Путевой лист</th>
+                        <th>Водитель</th>
+                        <th>ТС</th>
+                        <th>Маршрут</th>
+                        <th>Количество</th>
+                        <th>Статус</th>
+                        <th>Время</th>
+                        <th>Сумма</th>
+                        <th width="120">Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="tripsTableBody">
+                    <tr>
+                        <td colspan="11" class="text-center text-muted py-4">
+                            <i class="fas fa-search fa-2x mb-2"></i>
+                            <p>Выберите параметры фильтрации и нажмите "Показать"</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно подтверждения удаления -->
+<div class="modal fade" id="deleteTripModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Подтверждение удаления</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Внимание!</strong> Вы собираетесь удалить рейс.
+                </div>
+                <p>Удалить рейс <strong id="tripToDelete"></strong>?</p>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="cancelCalendarEvent" checked>
+                    <label class="form-check-label" for="cancelCalendarEvent">
+                        Также удалить событие из Google Calendar
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteTrip">
+                    <i class="fas fa-trash"></i> Удалить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentTripId = null;
+let allTrips = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Устанавливаем дефолтные даты (последние 30 дней)
+    const today = new Date();
+    const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    
+    document.getElementById('endDate').value = today.toISOString().split('T')[0];
+    document.getElementById('startDate').value = monthAgo.toISOString().split('T')[0];
+    
+    // Загружаем фильтры
+    loadFilterOptions();
+    
+    // Загружаем рейсы
+    loadTrips();
+    
+    // Обработчик подтверждения удаления
+    document.getElementById('confirmDeleteTrip').addEventListener('click', function() {
+        deleteTrip(currentTripId);
+    });
+});
+
+async function loadFilterOptions() {
+    try {
+        // Загружаем водителей
+        const driversResponse = await fetch('/api/drivers');
+        if (driversResponse.ok) {
+            const drivers = await driversResponse.json();
+            const driverSelect = document.getElementById('driverFilter');
+            
+            drivers.forEach(driver => {
+                const option = document.createElement('option');
+                option.value = driver.id;
+                option.textContent = `${driver.surname} ${driver.first_name}`;
+                driverSelect.appendChild(option);
+            });
+        }
+        
+        // Загружаем ТС
+        const vehiclesResponse = await fetch('/api/vehicles');
+        if (vehiclesResponse.ok) {
+            const vehicles = await vehiclesResponse.json();
+            const vehicleSelect = document.getElementById('vehicleFilter');
+            
+            vehicles.forEach(vehicle => {
+                const option = document.createElement('option');
+                option.value = vehicle.id;
+                option.textContent = `${vehicle.number} (${vehicle.model})`;
+                vehicleSelect.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки фильтров:', error);
+    }
+}
+
+async function loadTrips() {
+    try {
+        const formData = new FormData(document.getElementById('tripsFilter'));
+        const params = new URLSearchParams();
+        
+        for (const [key, value] of formData.entries()) {
+            if (value) params.append(key, value);
+        }
+        
+        const response = await fetch(`/api/reports/trips?${params}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            allTrips = result.data;
+            displayTrips(allTrips);
+            updateStatistics(allTrips);
+        } else {
+            showAlert('Ошибка загрузки рейсов: ' + result.error, 'danger');
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки рейсов:', error);
+        showAlert('Произошла ошибка при загрузке рейсов', 'danger');
+    }
+}
+
+function displayTrips(trips) {
+    const tbody = document.getElementById('tripsTableBody');
+    
+    if (!trips || trips.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="11" class="text-center text-muted py-4">
+                    <i class="fas fa-inbox fa-2x mb-2"></i>
+                    <p>Рейсы не найдены</p>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    const statusBadges = {
+        'created': 'badge bg-secondary',
+        'started': 'badge bg-warning',
+        'completed': 'badge bg-success',
+        'cancelled': 'badge bg-danger'
+    };
+    
+    const statusTexts = {
+        'created': 'Создан',
+        'started': 'В пути',
+        'completed': 'Завершен',
+        'cancelled': 'Отменен'
+    };
+    
+    tbody.innerHTML = trips.map(trip => {
+        const statusClass = statusBadges[trip.status] || 'badge bg-light';
+        const statusText = statusTexts[trip.status] || trip.status;
+        
+        // Форматирование времени
+        let timeInfo = '-';
+        if (trip.started_at && trip.completed_at) {
+            const startTime = new Date(trip.started_at).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
+            const endTime = new Date(trip.completed_at).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
+            timeInfo = `${startTime} - ${endTime}`;
+            
+            if (trip.duration_hours) {
+                const hours = Math.floor(trip.duration_hours);
+                const minutes = Math.round((trip.duration_hours - hours) * 60);
+                timeInfo += `<br><small class="text-muted">(${hours}ч ${minutes}мин)</small>`;
+            }
+        } else if (trip.started_at) {
+            const startTime = new Date(trip.started_at).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
+            timeInfo = `${startTime} - ...`;
+        }
+        
+        return `
+            <tr>
+                <td>${trip.id}</td>
+                <td>${new Date(trip.date).toLocaleDateString('ru-RU')}</td>
+                <td><strong>${trip.waybill_number}</strong></td>
+                <td>${trip.driver_name}</td>
+                <td>${trip.vehicle_number}</td>
+                <td>№${trip.route_name.split('№')[1] || trip.route_name}</td>
+                <td>${trip.quantity} шт.</td>
+                <td><span class="${statusClass}">${statusText}</span></td>
+                <td>${timeInfo}</td>
+                <td><strong>${formatCurrency(trip.total_amount)}</strong></td>
+                <td>
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-sm btn-outline-info" onclick="showTripDetails(${trip.id})" title="Детали">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        ${trip.status !== 'started' ? `
+                            <button class="btn btn-sm btn-outline-danger" onclick="confirmDeleteTrip(${trip.id}, '${trip.waybill_number}')" title="Удалить">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        ` : `
+                            <button class="btn btn-sm btn-secondary" disabled title="Нельзя удалить активный рейс">
+                                <i class="fas fa-lock"></i>
+                            </button>
+                        `}
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function updateStatistics(trips) {
+    const totalTrips = trips.length;
+    const completedTrips = trips.filter(t => t.status === 'completed').length;
+    const activeTrips = trips.filter(t => t.status === 'started').length;
+    const totalRevenue = trips.filter(t => t.status === 'completed').reduce((sum, trip) => sum + trip.total_amount, 0);
+    
+    document.getElementById('totalTrips').textContent = totalTrips;
+    document.getElementById('completedTrips').textContent = completedTrips;
+    document.getElementById('activeTrips').textContent = activeTrips;
+    document.getElementById('totalRevenue').textContent = formatCurrency(totalRevenue);
+}
+
+function confirmDeleteTrip(tripId, waybillNumber) {
+    currentTripId = tripId;
+    document.getElementById('tripToDelete').textContent = `#${waybillNumber}`;
+    
+    const modal = new bootstrap.Modal(document.getElementById('deleteTripModal'));
+    modal.show();
+}
+
+async function deleteTrip(tripId) {
+    const cancelCalendarEvent = document.getElementById('cancelCalendarEvent').checked;
+    
+    try {
+        const response = await fetch(`/trips/${tripId}?cancel_calendar_event=${cancelCalendarEvent}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert(result.message, 'success');
+            
+            // Закрываем модальное окно
+            bootstrap.Modal.getInstance(document.getElementById('deleteTripModal')).hide();
+            
+            // Перезагружаем данные
+            loadTrips();
+        } else {
+            showAlert('Ошибка: ' + result.message, 'danger');
+        }
+    } catch (error) {
+        showAlert('Произошла ошибка при удалении рейса', 'danger');
+    }
+}
+
+function showTripDetails(tripId) {
+    const trip = allTrips.find(t => t.id === tripId);
+    if (!trip) return;
+    
+    let detailsHtml = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Основная информация</h6>
+                <table class="table table-borderless">
+                    <tr><td><strong>ID рейса:</strong></td><td>${trip.id}</td></tr>
+                    <tr><td><strong>Дата:</strong></td><td>${new Date(trip.date).toLocaleDateString('ru-RU')}</td></tr>
+                    <tr><td><strong>Путевой лист:</strong></td><td>${trip.waybill_number}</td></tr>
+                    <tr><td><strong>Статус:</strong></td><td>
+                        <span class="badge ${trip.status === 'completed' ? 'bg-success' : trip.status === 'started' ? 'bg-warning' : 'bg-secondary'}">
+                            ${trip.status === 'completed' ? 'Завершен' : trip.status === 'started' ? 'В пути' : 'Создан'}
+                        </span>
+                    </td></tr>
+                    <tr><td><strong>Количество:</strong></td><td>${trip.quantity} шт.</td></tr>
+                    <tr><td><strong>Сумма:</strong></td><td><strong>${formatCurrency(trip.total_amount)}</strong></td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6>Участники</h6>
+                <table class="table table-borderless">
+                    <tr><td><strong>Водитель:</strong></td><td>${trip.driver_name}</td></tr>
+                    <tr><td><strong>ТС:</strong></td><td>${trip.vehicle_number} (${trip.vehicle_model || 'N/A'})</td></tr>
+                    <tr><td><strong>Маршрут:</strong></td><td>${trip.route_name}</td></tr>
+                </table>
+                
+                <h6>Временные метки</h6>
+                <table class="table table-borderless">
+    `;
+    
+    if (trip.started_at) {
+        detailsHtml += `<tr><td><strong>Начало:</strong></td><td>${new Date(trip.started_at).toLocaleString('ru-RU')}</td></tr>`;
+    }
+    
+    if (trip.completed_at) {
+        detailsHtml += `<tr><td><strong>Окончание:</strong></td><td>${new Date(trip.completed_at).toLocaleString('ru-RU')}</td></tr>`;
+    }
+    
+    if (trip.duration_hours) {
+        const hours = Math.floor(trip.duration_hours);
+        const minutes = Math.round((trip.duration_hours - hours) * 60);
+        detailsHtml += `<tr><td><strong>Продолжительность:</strong></td><td>${hours}ч ${minutes}мин</td></tr>`;
+    }
+    
+    detailsHtml += `
+                </table>
+            </div>
+        </div>
+    `;
+    
+    // Создаем модальное окно для деталей
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Детали рейса #${trip.waybill_number}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    ${detailsHtml}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+    
+    // Удаляем модальное окно после закрытия
+    modal.addEventListener('hidden.bs.modal', function() {
+        document.body.removeChild(modal);
+    });
+}
+
+function refreshTrips() {
+    loadTrips();
+    showAlert('Данные обновлены', 'info');
+}
+
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('ru-RU', {
+        style: 'currency',
+        currency: 'RUB',
+        minimumFractionDigits: 0
+    }).format(amount);
+}
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 3000);
+}
+</script>
+{% endblock %}

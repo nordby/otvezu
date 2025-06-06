@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block title %}Маршруты - Система экспедирования{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Управление маршрутами</h1>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addRouteModal">
+        <i class="fas fa-plus"></i> Добавить маршрут
+    </button>
+</div>
+
+<div class="card shadow">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Номер</th>
+                        <th>Название</th>
+                        <th>Цена (₽)</th>
+                        <th>Описание</th>
+                        <th>Статус</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for route in routes %}
+                    <tr>
+                        <td>{{ route.id }}</td>
+                        <td><strong>№{{ route.number }}</strong></td>
+                        <td>{{ route.name }}</td>
+                        <td>
+                            <span class="fw-bold text-success">{{ "{:,.0f}".format(route.price) }} ₽</span>
+                            <button class="btn btn-sm btn-outline-primary ms-2" onclick="updatePrice({{ route.id }}, {{ route.price }})">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </td>
+                        <td>{{ route.description or "—" }}</td>
+                        <td>
+                            {% if route.is_active %}
+                                <span class="badge bg-success">Активен</span>
+                            {% else %}
+                                <span class="badge bg-danger">Неактивен</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if route.is_active %}
+                                <button class="btn btn-sm btn-outline-warning" onclick="toggleRouteStatus({{ route.id }}, false)">
+                                    <i class="fas fa-pause"></i> Деактивировать
+                                </button>
+                            {% else %}
+                                <button class="btn btn-sm btn-outline-success" onclick="toggleRouteStatus({{ route.id }}, true)">
+                                    <i class="fas fa-play"></i> Активировать
+                                </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно добавления маршрута -->
+<div class="modal fade" id="addRouteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить маршрут</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addRouteForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="number" class="form-label">Номер маршрута *</label>
+                        <input type="text" class="form-control" id="number" name="number" required placeholder="Например: 13">
+                    </div>
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Название *</label>
+                        <input type="text" class="form-control" id="name" name="name" required placeholder="Например: Центральный район">
+                    </div>
+                    <div class="mb-3">
+                        <label for="price" class="form-label">Цена (₽) *</label>
+                        <input type="number" step="0.01" class="form-control" id="price" name="price" required placeholder="Например: 2500">
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Описание</label>
+                        <textarea class="form-control" id="description" name="description" rows="3" placeholder="Описание маршрута"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Создать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно обновления цены -->
+<div class="modal fade" id="updatePriceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Обновить цену маршрута</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="updatePriceForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="new_price" class="form-label">Новая цена (₽) *</label>
+                        <input type="number" step="0.01" class="form-control" id="new_price" name="price" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-success">Обновить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentRouteId = null;
+
+document.getElementById('addRouteForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    
+    try {
+        const response = await fetch('/routes/create', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('Маршрут создан успешно!');
+            location.reload();
+        } else {
+            alert('Ошибка: ' + result.message);
+        }
+    } catch (error) {
+        alert('Произошла ошибка при создании маршрута');
+    }
+});
+
+document.getElementById('updatePriceForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    if (!currentRouteId) return;
+    
+    const formData = new FormData(this);
+    
+    try {
+        const response = await fetch(`/routes/${currentRouteId}/update_price`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('Цена маршрута обновлена успешно!');
+            location.reload();
+        } else {
+            alert('Ошибка: ' + result.message);
+        }
+    } catch (error) {
+        alert('Произошла ошибка при обновлении цены');
+    }
+});
+
+function updatePrice(routeId, currentPrice) {
+    currentRouteId = routeId;
+    document.getElementById('new_price').value = currentPrice;
+    new bootstrap.Modal(document.getElementById('updatePriceModal')).show();
+}
+
+async function toggleRouteStatus(routeId, activate) {
+    const action = activate ? 'activate' : 'deactivate';
+    const confirmMessage = activate ? 'Активировать маршрут?' : 'Деактивировать маршрут?';
+    
+    if (!confirm(confirmMessage)) return;
+    
+    try {
+        const response = await fetch(`/routes/${routeId}/${action}`, {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(result.message);
+            location.reload();
+        } else {
+            alert('Ошибка: ' + result.message);
+        }
+    } catch (error) {
+        alert('Произошла ошибка при изменении статуса маршрута');
+    }
+}
+</script>
+{% endblock %}

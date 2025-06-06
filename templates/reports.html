@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Отчеты - Система экспедирования{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Отчеты и аналитика</h1>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Генерация Excel отчета</h6>
+            </div>
+            <div class="card-body">
+                <form id="reportForm">
+                    <div class="mb-3">
+                        <label for="start_date" class="form-label">Дата начала</label>
+                        <input type="date" class="form-control" id="start_date" name="start_date">
+                    </div>
+                    <div class="mb-3">
+                        <label for="end_date" class="form-label">Дата окончания</label>
+                        <input type="date" class="form-control" id="end_date" name="end_date">
+                    </div>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-file-excel"></i> Скачать Excel
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Быстрые отчеты</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary" onclick="generateQuickReport('week')">
+                        <i class="fas fa-calendar-week"></i> Отчет за неделю
+                    </button>
+                    <button class="btn btn-outline-primary" onclick="generateQuickReport('month')">
+                        <i class="fas fa-calendar-alt"></i> Отчет за месяц
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Просмотр рейсов</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="tripsTable">
+                <thead>
+                    <tr>
+                        <th>№</th>
+                        <th>Дата</th>
+                        <th>Путевой лист</th>
+                        <th>Наименование услуги</th>
+                        <th>Водитель</th>
+                        <th>Ставка</th>
+                        <th>Стоимость услуги</th>
+                        <th>НДС</th>
+                        <th>Итого</th>
+                    </tr>
+                </thead>
+                <tbody id="tripsTableBody">
+                    <!-- Данные загружаются через JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Загрузка рейсов при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    loadTrips();
+});
+
+async function loadTrips(startDate = null, endDate = null) {
+    try {
+        let url = '/api/trips';
+        const params = new URLSearchParams();
+        
+        if (startDate) params.append('start_date', startDate);
+        if (endDate) params.append('end_date', endDate);
+        
+        if (params.toString()) {
+            url += '?' + params.toString();
+        }
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        const tbody = document.getElementById('tripsTableBody');
+        tbody.innerHTML = '';
+        
+        let totalAmount = 0;
+        
+        data.trips.forEach((trip, index) => {
+            const row = tbody.insertRow();
+            row.innerHTML = `
+                <td>${index + 1}</td>
+                <td>${trip.date}</td>
+                <td>${trip.waybill_number}</td>
+                <td>${trip.service_description}</td>
+                <td>${trip.driver_name}</td>
+                <td>${trip.rate.toLocaleString()} ₽</td>
+                <td>${trip.rate.toLocaleString()} ₽</td>
+                <td>Без НДС</td>
+                <td>${trip.total_amount.toLocaleString()} ₽</td>
+            `;
+            totalAmount += trip.total_amount;
+        });
+        
+        // Добавляем итоговую строку
+        if (data.trips.length > 0) {
+            const totalRow = tbody.insertRow();
+            totalRow.innerHTML = `
+                <td colspan="8" class="text-end"><strong>ИТОГО:</strong></td>
+                <td><strong>${totalAmount.toLocaleString()} ₽</strong></td>
+            `;
+            totalRow.className = 'table-warning';
+        }
+        
+    } catch (error) {
+        console.error('Ошибка загрузки рейсов:', error);
+        alert('Ошибка загрузки данных');
+    }
+}
+
+document.getElementById('reportForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const params = new URLSearchParams();
+    
+    if (formData.get('start_date')) {
+        params.append('start_date', formData.get('start_date'));
+    }
+    if (formData.get('end_date')) {
+        params.append('end_date', formData.get('end_date'));
+    }
+    
+    const url = '/reports/excel?' + params.toString();
+    window.open(url, '_blank');
+});
+
+function generateQuickReport(period) {
+    const today = new Date();
+    let startDate, endDate;
+    
+    switch (period) {
+        case 'today':
+            startDate = endDate = today.toISOString().split('T')[0];
+            break;
+        case 'week':
+            const weekAgo = new Date(today);
+            weekAgo.setDate(today.getDate() - 7);
+            startDate = weekAgo.toISOString().split('T')[0];
+            endDate = today.toISOString().split('T')[0];
+            break;
+        case 'month':
+            const monthAgo = new Date(today);
+            monthAgo.setMonth(today.getMonth() - 1);
+            startDate = monthAgo.toISOString().split('T')[0];
+            endDate = today.toISOString().split('T')[0];
+            break;
+    }
+    
+    // Обновляем таблицу
+    loadTrips(startDate, endDate);
+    
+    // Скачиваем Excel
+    const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
+    const url = '/reports/excel?' + params.toString();
+    window.open(url, '_blank');
+}
+</script>
+{% endblock %}="btn btn-outline-primary" onclick="generateQuickReport('today')">
+                        <i class="fas fa-calendar-day"></i> Отчет за сегодня
+                    </button>
+                    <button class

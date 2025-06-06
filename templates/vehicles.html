@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Автопарк - Система экспедирования{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Управление автопарком</h1>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addVehicleModal">
+        <i class="fas fa-plus"></i> Добавить ТС
+    </button>
+</div>
+
+<div class="card shadow">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Номер</th>
+                        <th>Модель</th>
+                        <th>Грузоподъемность (т)</th>
+                        <th>Статус</th>
+                        <th>Дата создания</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vehicle in vehicles %}
+                    <tr>
+                        <td>{{ vehicle.id }}</td>
+                        <td><strong>{{ vehicle.number }}</strong></td>
+                        <td>{{ vehicle.model }}</td>
+                        <td>{{ vehicle.capacity }}</td>
+                        <td>
+                            {% if vehicle.is_active %}
+                                <span class="badge bg-success">Активно</span>
+                            {% else %}
+                                <span class="badge bg-danger">Неактивно</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ vehicle.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                        <td>
+                            {% if vehicle.is_active %}
+                                <button class="btn btn-sm btn-outline-warning" onclick="toggleVehicleStatus({{ vehicle.id }}, false)">
+                                    <i class="fas fa-pause"></i> Деактивировать
+                                </button>
+                            {% else %}
+                                <button class="btn btn-sm btn-outline-success" onclick="toggleVehicleStatus({{ vehicle.id }}, true)">
+                                    <i class="fas fa-play"></i> Активировать
+                                </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно добавления ТС -->
+<div class="modal fade" id="addVehicleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить транспортное средство</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addVehicleForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="number" class="form-label">Номер ТС *</label>
+                        <input type="text" class="form-control" id="number" name="number" required placeholder="Например: 9745">
+                    </div>
+                    <div class="mb-3">
+                        <label for="model" class="form-label">Модель *</label>
+                        <input type="text" class="form-control" id="model" name="model" required placeholder="Например: ГАЗель Next">
+                    </div>
+                    <div class="mb-3">
+                        <label for="capacity" class="form-label">Грузоподъемность (тонн)</label>
+                        <input type="number" step="0.1" class="form-control" id="capacity" name="capacity" placeholder="Например: 1.5">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Создать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('addVehicleForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    
+    try {
+        const response = await fetch('/vehicles/create', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('Транспортное средство создано успешно!');
+            location.reload();
+        } else {
+            alert('Ошибка: ' + result.message);
+        }
+    } catch (error) {
+        alert('Произошла ошибка при создании ТС');
+    }
+});
+
+async function toggleVehicleStatus(vehicleId, activate) {
+    const action = activate ? 'activate' : 'deactivate';
+    const confirmMessage = activate ? 'Активировать ТС?' : 'Деактивировать ТС?';
+    
+    if (!confirm(confirmMessage)) return;
+    
+    try {
+        const response = await fetch(`/vehicles/${vehicleId}/${action}`, {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(result.message);
+            location.reload();
+        } else {
+            alert('Ошибка: ' + result.message);
+        }
+    } catch (error) {
+        alert('Произошла ошибка при изменении статуса ТС');
+    }
+}
+</script>
+{% endblock %}

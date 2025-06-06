@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Система экспедирования{% endblock %}</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-truck"></i> Система экспедирования
+            </a>
+            <div class="navbar-nav ms-auto">
+                <span class="navbar-text me-3">
+                    <i class="fas fa-user"></i> {{ user.first_name }} {{ user.surname }}
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/">
+                                <i class="fas fa-tachometer-alt"></i> Панель управления
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/drivers">
+                                <i class="fas fa-users"></i> Водители
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/vehicles">
+                                <i class="fas fa-truck"></i> Автопарк
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/routes">
+                                <i class="fas fa-map"></i> Маршруты
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/trips">
+                                <i class="fas fa-route"></i> Рейсы
+                            </a>
+                        </li>                            
+                        <li class="nav-item">
+                            <a class="nav-link" href="/reports">
+                                <i class="fas fa-chart-bar"></i> Отчеты
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/reports/analytics">
+                                <i class="fas fa-chart-line"></i> Аналитика
+                            </a>
+                        </li>                        
+                        <li class="nav-item">
+                            <a class="nav-link" href="/settings">
+                                <i class="fas fa-cog"></i> Настройки
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <main class="col-md-10 ms-sm-auto px-md-4">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/app.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

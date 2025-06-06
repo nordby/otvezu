@@ -1,0 +1,575 @@
+{% extends "base.html" %}
+
+{% block title %}Аналитика и отчеты - Система экспедирования{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Аналитика и расширенные отчеты</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshAllData()">
+                <i class="fas fa-sync-alt"></i> Обновить данные
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Фильтры отчетов -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Параметры отчетов</h6>
+    </div>
+    <div class="card-body">
+        <form id="reportFilters">
+            <div class="row">
+                <div class="col-md-2">
+                    <label for="reportType" class="form-label">Тип отчета</label>
+                    <select class="form-select" id="reportType" name="report_type">
+                        <option value="drivers">По водителям</option>
+                        <option value="vehicles">По ТС</option>
+                        <option value="routes">По маршрутам</option>
+                        <option value="trips">Детальный</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="startDate" class="form-label">Дата начала</label>
+                    <input type="date" class="form-control" id="startDate" name="start_date">
+                </div>
+                <div class="col-md-3">
+                    <label for="endDate" class="form-label">Дата окончания</label>
+                    <input type="date" class="form-control" id="endDate" name="end_date">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">&nbsp;</label>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-primary" onclick="loadReportData()">
+                            <i class="fas fa-search"></i> Показать
+                        </button>
+                        <button type="button" class="btn btn-success" onclick="exportToExcel()">
+                            <i class="fas fa-file-excel"></i> Экспорт Excel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Dashboard Cards -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Активные рейсы</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="activeTrips">-</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-truck fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Доход за месяц</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="monthlyRevenue">-</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Процент завершения</div>
+                        <div class="row no-gutters align-items-center">
+                            <div class="col-auto">
+                                <div class="h5 mb-0 mr-3 font-weight-bold text-gray-800" id="completionRate">-</div>
+                            </div>
+                            <div class="col">
+                                <div class="progress progress-sm mr-2">
+                                    <div class="progress-bar bg-info" id="completionProgress" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-clipboard-list fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Ср. время поездки</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="avgDuration">-</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-clock fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reports Table -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary" id="reportTitle">Отчет по водителям</h6>
+    </div>
+    <div class="card-body">
+        <div id="reportTableContainer">
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-chart-bar fa-3x mb-3"></i>
+                <p>Выберите параметры и нажмите "Показать" для генерации отчета</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row">
+    <div class="col-xl-8 col-lg-7">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">График доходов</h6>
+            </div>
+            <div class="card-body">
+                <canvas id="revenueChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-4 col-lg-5">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Распределение статусов</h6>
+            </div>
+            <div class="card-body">
+                <canvas id="statusChart" width="400" height="400"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<script>
+let currentReportType = 'drivers';
+let revenueChart = null;
+let statusChart = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Устанавливаем дефолтные даты (последние 30 дней)
+    const today = new Date();
+    const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    
+    document.getElementById('endDate').value = today.toISOString().split('T')[0];
+    document.getElementById('startDate').value = monthAgo.toISOString().split('T')[0];
+    
+    // Загружаем данные дашборда
+    loadDashboardData();
+    
+    // Загружаем первоначальный отчет
+    loadReportData();
+    
+    // Обработчик изменения типа отчета
+    document.getElementById('reportType').addEventListener('change', function() {
+        currentReportType = this.value;
+        updateReportTitle();
+    });
+});
+
+function updateReportTitle() {
+    const titles = {
+        'drivers': 'Отчет по водителям',
+        'vehicles': 'Отчет по транспортным средствам',
+        'routes': 'Отчет по маршрутам',
+        'trips': 'Детальный отчет по рейсам'
+    };
+    document.getElementById('reportTitle').textContent = titles[currentReportType];
+}
+
+async function loadDashboardData() {
+    try {
+        const response = await fetch('/api/reports/dashboard');
+        const result = await response.json();
+        
+        if (result.success) {
+            const data = result.data;
+            
+            document.getElementById('activeTrips').textContent = data.active_trips;
+            document.getElementById('monthlyRevenue').textContent = formatCurrency(data.revenue_month);
+            document.getElementById('completionRate').textContent = data.completion_rate + '%';
+            document.getElementById('avgDuration').textContent = data.avg_duration_hours + 'ч';
+            
+            // Обновляем прогресс-бар
+            document.getElementById('completionProgress').style.width = data.completion_rate + '%';
+            
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки данных дашборда:', error);
+    }
+}
+
+async function loadReportData() {
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const reportType = document.getElementById('reportType').value;
+    
+    currentReportType = reportType;
+    updateReportTitle();
+    
+    try {
+        const params = new URLSearchParams();
+        if (startDate) params.append('start_date', startDate);
+        if (endDate) params.append('end_date', endDate);
+        
+        const response = await fetch(`/api/reports/${reportType}?${params}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            displayReportTable(result.data, reportType);
+            updateCharts(result.data, reportType);
+        } else {
+            showError('Ошибка загрузки отчета: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки отчета:', error);
+        showError('Ошибка загрузки отчета');
+    }
+}
+
+function displayReportTable(data, reportType) {
+    const container = document.getElementById('reportTableContainer');
+    
+    if (!data || data.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted py-4">Нет данных для отображения</div>';
+        return;
+    }
+    
+    let tableHtml = '<div class="table-responsive"><table class="table table-bordered table-hover"><thead class="table-dark">';
+    
+    // Заголовки таблицы в зависимости от типа отчета
+    if (reportType === 'drivers') {
+        tableHtml += `
+            <tr>
+                <th>Водитель</th>
+                <th>Рейсов</th>
+                <th>Завершено</th>
+                <th>Отменено</th>
+                <th>Доход</th>
+                <th>Ср. время</th>
+                <th>% завершения</th>
+            </tr>
+        `;
+    } else if (reportType === 'vehicles') {
+        tableHtml += `
+            <tr>
+                <th>ТС</th>
+                <th>Модель</th>
+                <th>Рейсов</th>
+                <th>Завершено</th>
+                <th>Доход</th>
+                <th>Количество</th>
+                <th>Ср. время</th>
+            </tr>
+        `;
+    } else if (reportType === 'routes') {
+        tableHtml += `
+            <tr>
+                <th>Маршрут</th>
+                <th>Название</th>
+                <th>Цена</th>
+                <th>Рейсов</th>
+                <th>Завершено</th>
+                <th>Доход</th>
+                <th>Ср. время</th>
+            </tr>
+        `;
+    } else if (reportType === 'trips') {
+        tableHtml += `
+            <tr>
+                <th>Дата</th>
+                <th>Путевой лист</th>
+                <th>Водитель</th>
+                <th>ТС</th>
+                <th>Маршрут</th>
+                <th>Количество</th>
+                <th>Статус</th>
+                <th>Сумма</th>
+            </tr>
+        `;
+    }
+    
+    tableHtml += '</thead><tbody>';
+    
+    // Данные таблицы
+    data.forEach(item => {
+        tableHtml += '<tr>';
+        
+        if (reportType === 'drivers') {
+            tableHtml += `
+                <td><strong>${item.driver_name}</strong></td>
+                <td>${item.total_trips}</td>
+                <td><span class="badge bg-success">${item.completed_trips}</span></td>
+                <td><span class="badge bg-danger">${item.cancelled_trips}</span></td>
+                <td><strong>${formatCurrency(item.total_revenue)}</strong></td>
+                <td>${item.avg_duration_hours}ч</td>
+                <td>
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar" style="width: ${item.completion_rate}%">${item.completion_rate}%</div>
+                    </div>
+                </td>
+            `;
+        } else if (reportType === 'vehicles') {
+            tableHtml += `
+                <td><strong>${item.vehicle_number}</strong></td>
+                <td>${item.vehicle_model}</td>
+                <td>${item.total_trips}</td>
+                <td><span class="badge bg-success">${item.completed_trips}</span></td>
+                <td><strong>${formatCurrency(item.total_revenue)}</strong></td>
+                <td>${item.total_quantity}</td>
+                <td>${item.avg_duration_hours}ч</td>
+            `;
+        } else if (reportType === 'routes') {
+            tableHtml += `
+                <td><strong>№${item.route_number}</strong></td>
+                <td>${item.route_name}</td>
+                <td>${formatCurrency(item.route_price)}</td>
+                <td>${item.total_trips}</td>
+                <td><span class="badge bg-success">${item.completed_trips}</span></td>
+                <td><strong>${formatCurrency(item.total_revenue)}</strong></td>
+                <td>${item.avg_duration_hours}ч</td>
+            `;
+        } else if (reportType === 'trips') {
+            const statusBadges = {
+                'completed': 'bg-success',
+                'started': 'bg-warning',
+                'created': 'bg-info',
+                'cancelled': 'bg-danger'
+            };
+            const statusTexts = {
+                'completed': 'Завершен',
+                'started': 'В пути',
+                'created': 'Создан',
+                'cancelled': 'Отменен'
+            };
+            
+            tableHtml += `
+                <td>${item.date}</td>
+                <td>${item.waybill_number}</td>
+                <td>${item.driver_name}</td>
+                <td>${item.vehicle_number}</td>
+                <td>№${item.route_name}</td>
+                <td>${item.quantity}</td>
+                <td><span class="badge ${statusBadges[item.status] || 'bg-secondary'}">${statusTexts[item.status] || item.status}</span></td>
+                <td><strong>${formatCurrency(item.total_amount)}</strong></td>
+            `;
+        }
+        
+        tableHtml += '</tr>';
+    });
+    
+    tableHtml += '</tbody></table></div>';
+    container.innerHTML = tableHtml;
+}
+
+function updateCharts(data, reportType) {
+    // График доходов
+    const revenueData = data.slice(0, 10).map(item => ({
+        label: reportType === 'drivers' ? item.driver_name : 
+               reportType === 'vehicles' ? item.vehicle_number :
+               reportType === 'routes' ? `№${item.route_number}` : 
+               reportType === 'trips' ? item.driver_name : item.name,
+        value: item.total_revenue || item.total_amount || 0
+    }));
+    
+    updateRevenueChart(revenueData);
+    
+    // График статусов
+    if (reportType === 'trips') {
+        const statusData = {
+            completed: data.filter(t => t.status === 'completed').length,
+            started: data.filter(t => t.status === 'started').length,
+            created: data.filter(t => t.status === 'created').length,
+            cancelled: data.filter(t => t.status === 'cancelled').length
+        };
+        updateStatusChart(statusData);
+    } else {
+        const topData = data.slice(0, 5);
+        updateStatusChart(topData, reportType);
+    }
+}
+
+function updateRevenueChart(data) {
+    const ctx = document.getElementById('revenueChart').getContext('2d');
+    
+    if (revenueChart) {
+        revenueChart.destroy();
+    }
+    
+    revenueChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.map(item => item.label),
+            datasets: [{
+                label: 'Доход (₽)',
+                data: data.map(item => item.value),
+                backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return formatCurrency(value);
+                        }
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Доход: ' + formatCurrency(context.parsed.y);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateStatusChart(data, reportType = 'trips') {
+    const ctx = document.getElementById('statusChart').getContext('2d');
+    
+    if (statusChart) {
+        statusChart.destroy();
+    }
+    
+    let chartData, chartLabels;
+    
+    if (reportType === 'trips') {
+        chartLabels = ['Завершено', 'В пути', 'Создано', 'Отменено'];
+        chartData = [data.completed, data.started, data.created, data.cancelled];
+    } else {
+        chartLabels = data.map(item => 
+            reportType === 'drivers' ? item.driver_name.split(' ')[0] :
+            reportType === 'vehicles' ? item.vehicle_number :
+            `№${item.route_number}`
+        );
+        chartData = data.map(item => item.total_trips);
+    }
+    
+    statusChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: chartLabels,
+            datasets: [{
+                data: chartData,
+                backgroundColor: [
+                    '#28a745',
+                    '#ffc107', 
+                    '#17a2b8',
+                    '#dc3545',
+                    '#6f42c1'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+async function exportToExcel() {
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const reportType = document.getElementById('reportType').value;
+    
+    const params = new URLSearchParams();
+    params.append('report_type', reportType);
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    
+    const url = `/reports/excel/advanced?${params}`;
+    
+    // Создаем невидимую ссылку для скачивания
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = '';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showAlert('Отчет экспортируется...', 'info');
+}
+
+function refreshAllData() {
+    loadDashboardData();
+    loadReportData();
+    showAlert('Данные обновлены', 'success');
+}
+
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('ru-RU', {
+        style: 'currency',
+        currency: 'RUB',
+        minimumFractionDigits: 0
+    }).format(amount);
+}
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 3000);
+}
+
+function showError(message) {
+    showAlert(message, 'danger');
+}
+</script>
+{% endblock %}
